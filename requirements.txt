@@ -15,6 +15,9 @@ langgraph-checkpoint-sqlite
 langchain-chroma
 chromadb
 pypdf
+PyMuPDF
+Pillow
+pytesseract
 docx2txt
 langchain-tavily
 tavily-python

@@ -1,4 +1,5 @@
 import math
+from contextvars import ContextVar
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
@@ -10,12 +11,11 @@ from rag import retrieve_from_rag
 load_dotenv()
 
 
-CURRENT_THREAD_ID = "default"
+CURRENT_THREAD_ID = ContextVar("current_thread_id", default="default")
 
 
 def set_current_thread_id(thread_id: str):
-    global CURRENT_THREAD_ID
-    CURRENT_THREAD_ID = thread_id
+    CURRENT_THREAD_ID.set(thread_id)
 
 
 web_search = TavilySearch(
@@ -56,11 +56,13 @@ def search_uploaded_documents(query: str) -> str:
     """
     Search uploaded documents for relevant information.
     Use this when the user asks about uploaded PDFs, DOCX, TXT, notes, files, or documents.
+    Also use it for references such as "it", "this", "the file", or "the document" when a file was uploaded earlier in the current chat.
+    If content is returned, use it to answer the user's question instead of asking for the file again.
     """
 
     return retrieve_from_rag(
         query=query,
-        thread_id=CURRENT_THREAD_ID
+        thread_id=CURRENT_THREAD_ID.get()
     )
 
 
@@ -74,7 +76,7 @@ def remember_this(memory: str) -> str:
     """
 
     return save_memory(
-        thread_id=CURRENT_THREAD_ID,
+        thread_id=CURRENT_THREAD_ID.get(),
         memory=memory
     )
 
@@ -87,7 +89,7 @@ def recall_memory(query: str) -> str:
     """
 
     return search_memory(
-        thread_id=CURRENT_THREAD_ID,
+        thread_id=CURRENT_THREAD_ID.get(),
         query=query
     )
 

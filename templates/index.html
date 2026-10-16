@@ -1404,7 +1404,7 @@
 
         const file = fileInput.files[0];
 
-        addMessage("user", `📎 Uploaded document: ${file.name}`);
+        addMessage("user", `Uploaded document: ${file.name}`);
 
         const toolProgress = addToolProgress("Document Ingestion");
         statusText.textContent = "Using Document Ingestion...";
@@ -1426,7 +1426,7 @@
             if (data.success) {
                 addMessage(
                     "assistant",
-                    data.message + "\n\nYou can now ask questions about this document."
+                    `${data.message}\n\nThis document is attached to this chat. Ask a question below and I will search it first.`
                 );
 
                 await loadConversations();

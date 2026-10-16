@@ -122,7 +122,8 @@ async def upload_document(
 
         result = add_document_to_rag(
             file_path=file_path,
-            thread_id=thread_id
+            thread_id=thread_id,
+            display_name=filename
         )
 
         return JSONResponse({

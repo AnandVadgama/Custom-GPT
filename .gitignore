@@ -159,6 +159,11 @@ ENV/
 env.bak/
 venv.bak/
 
+# Local application state and uploaded files
+data/
+chroma_db/
+uploads/
+
 # Spyder project settings
 .spyderproject
 .spyproject

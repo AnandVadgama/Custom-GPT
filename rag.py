@@ -45,6 +45,38 @@ def read_file_text(file_path: str) -> str:
             text += page.extract_text() or ""
             text += "\n"
 
+        if len(text.strip()) >= 200:
+            return text
+
+        try:
+            import pymupdf
+            import pytesseract
+            from PIL import Image
+        except ImportError as error:
+            raise ValueError(
+                "This PDF appears to be scanned or image-based. Install PyMuPDF, "
+                "Pillow, pytesseract, and the Tesseract OCR engine before uploading it."
+            ) from error
+
+        ocr_text = []
+        pdf = pymupdf.open(file_path)
+
+        try:
+            for page in pdf:
+                pixmap = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
+                image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+                page_text = pytesseract.image_to_string(image).strip()
+
+                if page_text:
+                    ocr_text.append(page_text)
+        finally:
+            pdf.close()
+
+        text = "\n\n".join(ocr_text)
+
+        if not text.strip():
+            raise ValueError("No readable text could be extracted from this PDF.")
+
         return text
 
     if suffix == ".docx":
@@ -58,7 +90,7 @@ def read_file_text(file_path: str) -> str:
 
 
 
-def add_document_to_rag(file_path: str, thread_id: str):
+def add_document_to_rag(file_path: str, thread_id: str, display_name: str | None = None):
     text = read_file_text(file_path)
 
     if not text.strip():
@@ -76,16 +108,17 @@ def add_document_to_rag(file_path: str, thread_id: str):
             page_content=chunk,
             metadata={
                 "thread_id": thread_id,
-                "source": Path(file_path).name
+                "source": display_name or Path(file_path).name
             }
         )
         for chunk in chunks
     ]
 
+    vectorstore.delete(where={"thread_id": thread_id})
     vectorstore.add_documents(docs)
 
     return {
-        "filename": Path(file_path).name,
+        "filename": display_name or Path(file_path).name,
         "chunks": len(docs)
     }
 
@@ -93,7 +126,7 @@ def add_document_to_rag(file_path: str, thread_id: str):
 
 
 
-def retrieve_from_rag(query: str, thread_id: str, k: int = 4) -> str:
+def retrieve_from_rag(query: str, thread_id: str, k: int = 3, max_chars: int = 4200) -> str:
     docs = vectorstore.similarity_search(
         query,
         k=k,
@@ -104,11 +137,20 @@ def retrieve_from_rag(query: str, thread_id: str, k: int = 4) -> str:
         return "No relevant uploaded document content found."
 
     results = []
+    total_chars = 0
 
     for i, doc in enumerate(docs, start=1):
         source = doc.metadata.get("source", "uploaded document")
-        results.append(
-            f"[Source {i}: {source}]\n{doc.page_content}"
-        )
+        remaining = max_chars - total_chars
+
+        if remaining <= 0:
+            break
+
+        content = doc.page_content[:remaining]
+        results.append(f"[Source {i}: {source}]\n{content}")
+        total_chars += len(content)
+
+    if len(results) < len(docs):
+        results.append("[Context shortened to fit the model context window.]" )
 
     return "\n\n".join(results)

@@ -47,6 +47,10 @@ You can:
 Rules:
 - If the user asks about latest news, current events, recent updates, today's information, current prices, current people, current versions, new releases, or anything time-sensitive, use Tavily Search.
 - If the user asks about an uploaded document, use search_uploaded_documents.
+- After a document is uploaded in the current chat, treat references such as "it", "this", "the file", or "the document" as referring to that uploaded document and search it before answering.
+- For requests like "what is in it", "tell me about it", or "summarize it", always search the uploaded document first.
+- When document search returns content, answer from that content. Do not ask the user to upload or paste the document again.
+- If document search returns no relevant content, say that no readable matching content was found.
 - If the user asks you to remember something, use remember_this.
 - If the user asks about previous preferences or saved facts, use recall_memory.
 - Use calculator for math questions.
@@ -85,13 +89,20 @@ def build_agent(model_name: str):
     llm = ChatGroq(
         model=selected_model,
         temperature=0.3,
+        max_tokens=1200,
         streaming=True
     )
 
     llm_with_tools = llm.bind_tools(tools)
 
     def chatbot_node(state: MessagesState):
-        messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+        conversation = state["messages"]
+
+        # Keep the active tool exchange and recent chat within Groq's context limit.
+        if len(conversation) > 12:
+            conversation = conversation[-12:]
+
+        messages = [SystemMessage(content=SYSTEM_PROMPT)] + conversation
 
         response = llm_with_tools.invoke(messages)
 
